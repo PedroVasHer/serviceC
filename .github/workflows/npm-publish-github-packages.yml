@@ -1,62 +1,44 @@
-# This workflow will run tests using node and then publish a package to GitHub Packages when a release is created
-# For more information see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
-name: Node.js Package
+name: Publish with Auto Versioning
 
 on:
   push:
     branches:
       - main
-  release:
-    types: [created]
-  workflow_dispatch:
+    paths-ignore:
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  create-release:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Generate tag
-        id: generate_tag
-        run: |
-          TAG="v$(date +'%Y.%m.%d.%H%M%S')"
-          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.generate_tag.outputs.tag_name }}
-          name: Release ${{ steps.generate_tag.outputs.tag_name }}
-          body: |
-            Release created automatically on push to main.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build:
-    needs: create-release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-
-  publish-gpr:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://npm.pkg.github.com/
-      - run: echo "@PedroVasHer:registry=https://npm.pkg.github.com/" >> ~/.npmrc
-      - run: echo "//https://npm.pkg.github.com/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-      - run: npm publish
+
+      - name: Set .npmrc
+        run: |
+          echo "@PedroVasHer:registry=https://npm.pkg.github.com/" >> ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump patch version and push tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          npm version minor
+          git push origin main --follow-tags
+
+      - name: Publish to GitHub Packages
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
