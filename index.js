@@ -1,5 +1,5 @@
 function ServiceC() {
-    console.log("Log from Service C");
+    console.log("Hello from C");
     return "Log from Service C";
 };
 
